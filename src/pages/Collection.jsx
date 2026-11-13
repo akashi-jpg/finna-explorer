@@ -8,6 +8,10 @@ const API = "https://api.finna.fi";
 export default function Collection() {
   const { items, remove } = useCollection();
 
+  const handleClear = () => {
+    items.forEach((item) => remove(item.id));
+  };
+
   if (items.length === 0) {
     return (
       <>
@@ -19,7 +23,6 @@ export default function Collection() {
     );
   }
 
-  
   const counts = {};
   items.forEach((item) => {
     counts[item.format] = (counts[item.format] || 0) + 1;
@@ -31,7 +34,12 @@ export default function Collection() {
 
   return (
     <>
-      <h2>My collection ({items.length})</h2>
+      <div className="d-flex justify-content-between align-items-center">
+        <h2>My collection ({items.length})</h2>
+        <Button variant="outline-danger" size="sm" onClick={handleClear}>
+          Clear collection
+        </Button>
+      </div>
 
       <h5 className="mt-4">Items by format</h5>
       <div style={{ width: "100%", height: 250 }}>
