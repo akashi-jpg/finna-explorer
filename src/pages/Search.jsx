@@ -1,45 +1,63 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Form, Button, InputGroup, Row, Col, Card, Spinner, Alert } from "react-bootstrap";
 
 const API = "https://api.finna.fi";
 
 export default function Search() {
-  const [query, setQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlQuery = searchParams.get("q") || "";
+
+  const [query, setQuery] = useState(urlQuery);
   const [records, setRecords] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
 
-  async function handleSubmit(e) {
+  useEffect(() => {
+    setQuery(urlQuery);
+    if (!urlQuery.trim()) {
+      setRecords([]);
+      setTotal(0);
+      setSearched(false);
+      return;
+    }
+
+    async function fetchResults() {
+      setLoading(true);
+      setError("");
+      try {
+        const params = new URLSearchParams({
+          lookfor: urlQuery,
+          type: "AllFields",
+          limit: "24",
+        });
+        ["id", "title", "year", "images", "formats"].forEach((f) =>
+          params.append("field[]", f)
+        );
+
+        const response = await fetch(`${API}/v1/search?${params}`);
+        if (!response.ok) throw new Error(`Server returned ${response.status}`);
+
+        const data = await response.json();
+        setRecords(data.records ?? []);
+        setTotal(data.resultCount ?? 0);
+        setSearched(true);
+      } catch (err) {
+        setError(`Search failed: ${err.message}`);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchResults();
+  }, [urlQuery]);
+
+  function handleSubmit(e) {
     e.preventDefault();
     if (!query.trim()) return;
-
-    setLoading(true);
-    setError("");
-    try {
-      const params = new URLSearchParams({
-        lookfor: query,
-        type: "AllFields",
-        limit: "24",
-      });
-      ["id", "title", "year", "images", "formats"].forEach((f) =>
-        params.append("field[]", f)
-      );
-
-      const response = await fetch(`${API}/v1/search?${params}`);
-      if (!response.ok) throw new Error(`Server returned ${response.status}`);
-
-      const data = await response.json();
-      setRecords(data.records ?? []);
-      setTotal(data.resultCount ?? 0);
-      setSearched(true);
-    } catch (err) {
-      setError(`Search failed: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
+    setSearchParams({ q: query.trim() });
   }
 
   return (
@@ -62,7 +80,10 @@ export default function Search() {
 
       {loading && <Spinner animation="border" role="status" />}
       {error && <Alert variant="danger">{error}</Alert>}
-      {searched && !loading && !error && (
+      {searched && !loading && !error && records.length === 0 && (
+        <Alert variant="warning">No records found for "{urlQuery}".</Alert>
+      )}
+      {searched && !loading && !error && records.length > 0 && (
         <p className="text-muted">
           {total} results (showing {records.length})
         </p>
